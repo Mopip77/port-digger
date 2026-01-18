@@ -10,6 +10,8 @@ import (
 	"port-digger/scanner"
 )
 
+const version = "1.0.0"
+
 func main() {
 	// Initialize clipboard once at startup
 	err := clipboard.Init()
@@ -24,7 +26,7 @@ func main() {
 func onReady() {
 	systray.SetIcon(iconData())
 	systray.SetTitle("🔌")  // Port plug emoji as icon
-	systray.SetTooltip("Port Digger - Monitor TCP Ports")
+	systray.SetTooltip(fmt.Sprintf("Port Digger v%s - Monitor TCP Ports", version))
 
 	refreshMenu()
 }
@@ -69,6 +71,7 @@ func refreshMenu() {
 
 	// Add quit at bottom
 	systray.AddSeparator()
+	systray.AddMenuItem(fmt.Sprintf("Port Digger v%s", version), "About")
 	mQuit := systray.AddMenuItem("Quit", "Quit Port Digger")
 	go func() {
 		<-mQuit.ClickedCh

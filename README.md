@@ -10,6 +10,20 @@ A lightweight macOS menu bar tool for monitoring TCP listening ports.
 - ⚡ Kill processes (with sudo prompt when needed)
 - 💾 Minimal memory footprint (~10-20MB)
 
+## Screenshot
+
+```
+ 3000 • node
+ 8080 • Python
+27017 • mongod
+```
+
+**Example Actions:**
+- Click "3000 • node" → See submenu
+  - Open in Browser → Opens http://localhost:3000
+  - Copy Port Number → "3000" in clipboard
+  - Kill Process (PID: 12345) → Prompts for password, terminates node
+
 ## Installation
 
 ### From Source
