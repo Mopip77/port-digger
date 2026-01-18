@@ -23,3 +23,74 @@ func TestPortInfo_Validation(t *testing.T) {
 		t.Errorf("expected PID=12345, got %d", info.PID)
 	}
 }
+
+func TestParseLsofLine(t *testing.T) {
+	tests := []struct {
+		name     string
+		line     string
+		want     *PortInfo
+		wantErr  bool
+	}{
+		{
+			name: "valid TCP line",
+			line: "node      12345 user   23u  IPv4 0x1234      0t0  TCP *:3000 (LISTEN)",
+			want: &PortInfo{
+				Port:        3000,
+				ProcessName: "node",
+				PID:         12345,
+				Command:     "node",
+				Protocol:    "TCP",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid TCP6 line",
+			line: "Python    9876 user   5u  IPv6 0x5678      0t0  TCP6 *:8080 (LISTEN)",
+			want: &PortInfo{
+				Port:        8080,
+				ProcessName: "Python",
+				PID:         9876,
+				Command:     "Python",
+				Protocol:    "TCP6",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "invalid line - not enough fields",
+			line:    "node 12345",
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "header line",
+			line:    "COMMAND   PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME",
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := parseLsofLine(tt.line)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("parseLsofLine() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if tt.wantErr {
+				return
+			}
+			if got.Port != tt.want.Port {
+				t.Errorf("Port = %v, want %v", got.Port, tt.want.Port)
+			}
+			if got.ProcessName != tt.want.ProcessName {
+				t.Errorf("ProcessName = %v, want %v", got.ProcessName, tt.want.ProcessName)
+			}
+			if got.PID != tt.want.PID {
+				t.Errorf("PID = %v, want %v", got.PID, tt.want.PID)
+			}
+			if got.Protocol != tt.want.Protocol {
+				t.Errorf("Protocol = %v, want %v", got.Protocol, tt.want.Protocol)
+			}
+		})
+	}
+}
