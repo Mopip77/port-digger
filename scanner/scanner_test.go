@@ -25,6 +25,44 @@ func TestPortInfo_Validation(t *testing.T) {
 	}
 }
 
+func TestUnescapeLsofString(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "no escape sequences",
+			input: "node",
+			want:  "node",
+		},
+		{
+			name:  "space escaped as \\x20",
+			input: "Antigravity\\x20Helper\\x20(Plugin)",
+			want:  "Antigravity Helper (Plugin)",
+		},
+		{
+			name:  "multiple escape sequences",
+			input: "My\\x20App\\x20Name",
+			want:  "My App Name",
+		},
+		{
+			name:  "parentheses and spaces",
+			input: "App\\x20(Helper)",
+			want:  "App (Helper)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := unescapeLsofString(tt.input)
+			if got != tt.want {
+				t.Errorf("unescapeLsofString() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseLsofLine(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -53,6 +91,18 @@ func TestParseLsofLine(t *testing.T) {
 				PID:         9876,
 				Command:     "Python",
 				Protocol:    "TCP6",
+			},
+			wantErr: false,
+		},
+		{
+			name: "process name with escaped spaces",
+			line: "Antigravity\\x20Helper\\x20(Plugin)  4940 mcpp   26u  IPv4 0xe4f763a7847c6ef2      0t0  TCP 127.0.0.1:59531 (LISTEN)",
+			want: &PortInfo{
+				Port:        59531,
+				ProcessName: "Antigravity Helper (Plugin)",
+				PID:         4940,
+				Command:     "Antigravity Helper (Plugin)",
+				Protocol:    "TCP",
 			},
 			wantErr: false,
 		},

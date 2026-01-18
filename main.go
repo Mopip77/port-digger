@@ -88,13 +88,12 @@ func refreshMenu() {
 func addPortMenuItem(info scanner.PortInfo) {
 	// Format: " 3000 • node"
 	itemText := menu.FormatPortItem(info)
-	mPort := systray.AddMenuItem(itemText, fmt.Sprintf("Port %d - %s (PID: %d)",
-		info.Port, info.ProcessName, info.PID))
+	mPort := systray.AddMenuItem(itemText, "")
 
 	// Add submenu items
 	mOpen := mPort.AddSubMenuItem("Open in Browser", "Open http://localhost:PORT")
 	mCopy := mPort.AddSubMenuItem("Copy Port Number", "Copy to clipboard")
-	mPort.AddSubMenuItemCheckbox("", "", false) // separator-like
+	mPort.AddSubMenuItemCheckbox("------", "", false) // separator-like
 	mKill := mPort.AddSubMenuItem(
 		fmt.Sprintf("Kill Process (PID: %d)", info.PID),
 		"Terminate this process")

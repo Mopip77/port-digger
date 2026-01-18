@@ -18,6 +18,31 @@ type PortInfo struct {
 	Protocol    string // "TCP" or "TCP6"
 }
 
+// unescapeLsofString decodes hex escape sequences like \x20 to actual characters
+// lsof escapes special characters in command names using \xHH notation
+func unescapeLsofString(s string) string {
+	if !strings.Contains(s, "\\x") {
+		return s
+	}
+
+	var result strings.Builder
+	i := 0
+	for i < len(s) {
+		if i+3 < len(s) && s[i] == '\\' && s[i+1] == 'x' {
+			// Parse the two hex digits
+			hexStr := s[i+2 : i+4]
+			if val, err := strconv.ParseInt(hexStr, 16, 32); err == nil {
+				result.WriteByte(byte(val))
+				i += 4
+				continue
+			}
+		}
+		result.WriteByte(s[i])
+		i++
+	}
+	return result.String()
+}
+
 // parseLsofLine parses a single line of lsof output
 // Example: "node      12345 user   23u  IPv4 0x1234      0t0  TCP *:3000 (LISTEN)"
 func parseLsofLine(line string) (*PortInfo, error) {
@@ -82,17 +107,18 @@ func parseLsofLine(line string) (*PortInfo, error) {
 
 	return &PortInfo{
 		Port:        port,
-		ProcessName: fields[0],
+		ProcessName: unescapeLsofString(fields[0]),
 		PID:         pid,
-		Command:     fields[0],
+		Command:     unescapeLsofString(fields[0]),
 		Protocol:    protocol,
 	}, nil
 }
 
 // ScanPorts executes lsof to get all listening TCP ports
 func ScanPorts() ([]PortInfo, error) {
-	// Execute: lsof -iTCP -sTCP:LISTEN -nP
-	cmd := exec.Command("lsof", "-iTCP", "-sTCP:LISTEN", "-nP")
+	// Execute: lsof +c 0 -iTCP -sTCP:LISTEN -nP
+	// +c 0 shows full command name without truncation
+	cmd := exec.Command("lsof", "+c", "0", "-iTCP", "-sTCP:LISTEN", "-nP")
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
