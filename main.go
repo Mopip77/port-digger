@@ -98,7 +98,10 @@ func addPortMenuItem(info scanner.PortInfo) {
 			case <-mOpen.ClickedCh:
 				actions.OpenBrowser(info.Port)
 			case <-mCopy.ClickedCh:
-				actions.CopyToClipboard(info.Port)
+				err := actions.CopyToClipboard(info.Port)
+				if err != nil {
+					println("Failed to copy to clipboard:", err.Error())
+				}
 			case <-mKill.ClickedCh:
 				err := actions.KillProcess(info.PID)
 				if err != nil {
