@@ -1,7 +1,10 @@
 package scanner
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -84,4 +87,42 @@ func parseLsofLine(line string) (*PortInfo, error) {
 		Command:     fields[0],
 		Protocol:    protocol,
 	}, nil
+}
+
+// ScanPorts executes lsof to get all listening TCP ports
+func ScanPorts() ([]PortInfo, error) {
+	// Execute: lsof -iTCP -sTCP:LISTEN -nP
+	cmd := exec.Command("lsof", "-iTCP", "-sTCP:LISTEN", "-nP")
+
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		// lsof returns exit code 1 if no ports found - not an error
+		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			return []PortInfo{}, nil
+		}
+		return nil, fmt.Errorf("lsof command failed: %w", err)
+	}
+
+	var ports []PortInfo
+	scanner := bufio.NewScanner(&stdout)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Try to parse line, skip on error (headers, malformed lines)
+		info, err := parseLsofLine(line)
+		if err != nil {
+			continue
+		}
+
+		ports = append(ports, *info)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading lsof output: %w", err)
+	}
+
+	return ports, nil
 }

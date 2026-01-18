@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"runtime"
 	"testing"
 )
 
@@ -92,5 +93,38 @@ func TestParseLsofLine(t *testing.T) {
 				t.Errorf("Protocol = %v, want %v", got.Protocol, tt.want.Protocol)
 			}
 		})
+	}
+}
+
+func TestScanPorts(t *testing.T) {
+	// Only run on macOS (lsof behavior is OS-specific)
+	if runtime.GOOS != "darwin" {
+		t.Skip("ScanPorts test only runs on macOS")
+	}
+
+	ports, err := ScanPorts()
+	if err != nil {
+		t.Fatalf("ScanPorts() failed: %v", err)
+	}
+
+	// Should return at least empty slice, not nil
+	if ports == nil {
+		t.Error("ScanPorts() returned nil, expected slice")
+	}
+
+	// Validate each port has required fields
+	for i, p := range ports {
+		if p.Port == 0 {
+			t.Errorf("ports[%d].Port is 0", i)
+		}
+		if p.PID == 0 {
+			t.Errorf("ports[%d].PID is 0", i)
+		}
+		if p.ProcessName == "" {
+			t.Errorf("ports[%d].ProcessName is empty", i)
+		}
+		if p.Protocol != "TCP" && p.Protocol != "TCP6" {
+			t.Errorf("ports[%d].Protocol = %s, want TCP or TCP6", i, p.Protocol)
+		}
 	}
 }
