@@ -24,7 +24,7 @@ func main() {
 }
 
 func onReady() {
-	systray.SetIcon(iconData())
+	// Use emoji in title instead of icon data
 	systray.SetTitle("🔌")  // Port plug emoji as icon
 	systray.SetTooltip(fmt.Sprintf("Port Digger v%s - Monitor TCP Ports", version))
 
