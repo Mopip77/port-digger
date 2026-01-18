@@ -1,14 +1,19 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
-	"sort"
-	"github.com/getlantern/systray"
-	"golang.design/x/clipboard"
 	"port-digger/actions"
 	"port-digger/menu"
 	"port-digger/scanner"
+	"sort"
+
+	"github.com/getlantern/systray"
+	"golang.design/x/clipboard"
 )
+
+//go:embed icon/icon.png
+var iconData []byte
 
 const version = "1.0.0"
 
@@ -24,8 +29,8 @@ func main() {
 }
 
 func onReady() {
-	// Use emoji in title instead of icon data
-	systray.SetTitle("🔌")  // Port plug emoji as icon
+	// Use icon instead of emoji
+	systray.SetIcon(iconData)
 	systray.SetTooltip(fmt.Sprintf("Port Digger v%s - Monitor TCP Ports", version))
 
 	refreshMenu()
