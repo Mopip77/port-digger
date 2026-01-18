@@ -23,8 +23,8 @@ func main() {
 
 func onReady() {
 	systray.SetIcon(iconData())
-	systray.SetTitle("Port Digger")
-	systray.SetTooltip("Monitor TCP listening ports")
+	systray.SetTitle("🔌")  // Port plug emoji as icon
+	systray.SetTooltip("Port Digger - Monitor TCP Ports")
 
 	refreshMenu()
 }
