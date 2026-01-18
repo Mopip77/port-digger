@@ -35,9 +35,9 @@ func TestFormatPortItem(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := formatPortItem(tt.info)
+			got := FormatPortItem(tt.info)  // Capital F
 			if got != tt.want {
-				t.Errorf("formatPortItem() = %q, want %q", got, tt.want)
+				t.Errorf("FormatPortItem() = %q, want %q", got, tt.want)
 			}
 		})
 	}

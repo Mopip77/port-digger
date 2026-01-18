@@ -1,12 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"github.com/getlantern/systray"
+	"golang.design/x/clipboard"
+	"port-digger/actions"
+	"port-digger/menu"
 	"port-digger/scanner"
 )
 
 func main() {
+	// Initialize clipboard once at startup
+	err := clipboard.Init()
+	if err != nil {
+		// Non-fatal - clipboard features will just fail silently
+		println("Warning: clipboard not available:", err.Error())
+	}
+
 	systray.Run(onReady, onExit)
 }
 
@@ -67,7 +78,36 @@ func refreshMenu() {
 
 // Placeholder for next step
 func addPortMenuItem(info scanner.PortInfo) {
-	// TODO: implement in next task
+	// Format: " 3000 • node"
+	itemText := menu.FormatPortItem(info)
+	mPort := systray.AddMenuItem(itemText, fmt.Sprintf("Port %d - %s (PID: %d)",
+		info.Port, info.ProcessName, info.PID))
+
+	// Add submenu items
+	mOpen := mPort.AddSubMenuItem("Open in Browser", "Open http://localhost:PORT")
+	mCopy := mPort.AddSubMenuItem("Copy Port Number", "Copy to clipboard")
+	mPort.AddSubMenuItemCheckbox("", "", false) // separator-like
+	mKill := mPort.AddSubMenuItem(
+		fmt.Sprintf("Kill Process (PID: %d)", info.PID),
+		"Terminate this process")
+
+	// Handle submenu actions
+	go func() {
+		for {
+			select {
+			case <-mOpen.ClickedCh:
+				actions.OpenBrowser(info.Port)
+			case <-mCopy.ClickedCh:
+				actions.CopyToClipboard(info.Port)
+			case <-mKill.ClickedCh:
+				err := actions.KillProcess(info.PID)
+				if err != nil {
+					// Could show notification, but keep it simple for now
+					println("Failed to kill process:", err.Error())
+				}
+			}
+		}
+	}()
 }
 
 func onExit() {
