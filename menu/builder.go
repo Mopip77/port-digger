@@ -18,5 +18,5 @@ func FormatPortItemWithRewrite(info scanner.PortInfo, rewrittenName string) stri
 	if rewrittenName == "" || rewrittenName == "未知" || rewrittenName == info.ProcessName {
 		return FormatPortItem(info)
 	}
-	return fmt.Sprintf("%5d • %s (%s)", info.Port, info.ProcessName, rewrittenName)
+	return fmt.Sprintf("%5d • %s (%s✨)", info.Port, info.ProcessName, rewrittenName)
 }

@@ -64,6 +64,9 @@ func buildPrompt(command string) string {
 - 输入: /usr/bin/python3 -m http.server 8000
 - 输出: http.server
 
+- 输入: /Applications/Antigravity.app/Contents/MacOS/Electron .
+- 输出: Antigravity
+
 - 输入: node a.js
 - 输出: 未知
 
