@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"port-digger/actions"
+	"port-digger/llm"
 	"port-digger/menu"
 	"port-digger/scanner"
 	"sort"
@@ -11,6 +12,9 @@ import (
 	"github.com/getlantern/systray"
 	"golang.design/x/clipboard"
 )
+
+// Global LLM rewriter instance
+var rewriter *llm.Rewriter
 
 //go:embed icon/icon.png
 var iconData []byte
@@ -23,6 +27,12 @@ func main() {
 	if err != nil {
 		// Non-fatal - clipboard features will just fail silently
 		println("Warning: clipboard not available:", err.Error())
+	}
+
+	// Initialize LLM rewriter (non-fatal if it fails)
+	rewriter, err = llm.NewRewriter()
+	if err != nil {
+		println("Warning: LLM rewriter not available:", err.Error())
 	}
 
 	systray.Run(onReady, onExit)
@@ -77,6 +87,29 @@ func refreshMenu() {
 	// Add quit at bottom
 	systray.AddSeparator()
 	systray.AddMenuItem(fmt.Sprintf("Port Digger v%s", version), "About")
+
+	// LLM Settings submenu
+	mLLM := systray.AddMenuItem("⚙️ LLM Settings", "Configure LLM for process name rewriting")
+	mLLMOpen := mLLM.AddSubMenuItem("Open Config File", "Edit ~/.config/port-digger/config.yaml")
+	mLLMStatus := mLLM.AddSubMenuItemCheckbox("Enabled", "", rewriter != nil && rewriter.IsEnabled())
+	mLLMStatus.Disable() // Read-only indicator
+
+	go func() {
+		for range mLLMOpen.ClickedCh {
+			configPath, err := llm.ConfigPath()
+			if err != nil {
+				println("Failed to get config path:", err.Error())
+				continue
+			}
+			// Ensure config file exists
+			if err := llm.EnsureDefaultConfig(); err != nil {
+				println("Failed to create default config:", err.Error())
+			}
+			// Open in default editor using 'open' command on macOS
+			actions.OpenFile(configPath)
+		}
+	}()
+
 	mQuit := systray.AddMenuItem("Quit", "Quit Port Digger")
 	go func() {
 		<-mQuit.ClickedCh
@@ -86,8 +119,25 @@ func refreshMenu() {
 
 // Placeholder for next step
 func addPortMenuItem(info scanner.PortInfo) {
-	// Format: " 3000 • node"
-	itemText := menu.FormatPortItem(info)
+	// Get full command for LLM rewriting
+	fullCommand := scanner.GetFullCommand(info.PID)
+	if fullCommand == "" {
+		fullCommand = info.ProcessName
+	}
+
+	// Check for cached rewritten name
+	var rewrittenName string
+	if rewriter != nil && rewriter.IsEnabled() {
+		rewrittenName = rewriter.GetServiceName(fullCommand)
+
+		// Trigger async rewrite if not cached
+		if rewrittenName == "" {
+			rewriter.TriggerRewrite(fullCommand)
+		}
+	}
+
+	// Format menu item with rewritten name if available
+	itemText := menu.FormatPortItemWithRewrite(info, rewrittenName)
 	mPort := systray.AddMenuItem(itemText, "")
 
 	// Add submenu items

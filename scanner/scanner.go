@@ -18,6 +18,20 @@ type PortInfo struct {
 	Protocol    string // "TCP" or "TCP6"
 }
 
+// GetFullCommand retrieves the full command line for a process by PID
+// Uses: ps -p <pid> -o command=
+func GetFullCommand(pid int) string {
+	cmd := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "command=")
+	var stdout bytes.Buffer
+	cmd.Stdout = &stdout
+
+	if err := cmd.Run(); err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(stdout.String())
+}
+
 // unescapeLsofString decodes hex escape sequences like \x20 to actual characters
 // lsof escapes special characters in command names using \xHH notation
 func unescapeLsofString(s string) string {
