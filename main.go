@@ -3,8 +3,11 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"os/exec"
 	"port-digger/actions"
 	"port-digger/llm"
+	"port-digger/logger"
 	"port-digger/menu"
 	"port-digger/scanner"
 	"sort"
@@ -22,17 +25,30 @@ var iconData []byte
 const version = "1.0.0"
 
 func main() {
+	// Initialize logger first
+	err := logger.Init()
+	if err != nil {
+		println("Warning: logger initialization failed:", err.Error())
+	}
+	defer logger.Close()
+
+	logger.Info("Port Digger v%s starting...", version)
+
 	// Initialize clipboard once at startup
-	err := clipboard.Init()
+	err = clipboard.Init()
 	if err != nil {
 		// Non-fatal - clipboard features will just fail silently
 		println("Warning: clipboard not available:", err.Error())
+		logger.Error("Clipboard initialization failed: %v", err)
 	}
 
 	// Initialize LLM rewriter (non-fatal if it fails)
 	rewriter, err = llm.NewRewriter()
 	if err != nil {
 		println("Warning: LLM rewriter not available:", err.Error())
+		logger.Error("LLM rewriter initialization failed: %v", err)
+	} else {
+		logger.Info("LLM rewriter initialized successfully")
 	}
 
 	systray.Run(onReady, onExit)
@@ -43,34 +59,37 @@ func onReady() {
 	systray.SetIcon(iconData)
 	systray.SetTooltip(fmt.Sprintf("Port Digger v%s - Monitor TCP Ports", version))
 
-	refreshMenu()
+	logger.Info("Building menu...")
+	buildMenu()
 }
 
-func refreshMenu() {
-	// Clear menu - systray doesn't have ResetMenu, we'll work around this
-	// by just building the menu once and updating it dynamically
-	// For now, let's just build the menu structure
-
+func buildMenu() {
 	// Add refresh button
 	mRefresh := systray.AddMenuItem("🔄 Refresh", "Rescan ports")
 	go func() {
 		for range mRefresh.ClickedCh {
-			// Note: systray doesn't support dynamic menu rebuild easily
-			// This is a limitation we'll note
+			logger.Info("Refresh button clicked, restarting app...")
+			// Restart the app to rebuild menu
+			restartApp()
 		}
 	}()
 
 	systray.AddSeparator()
 
 	// Scan ports
+	logger.Info("Scanning ports...")
 	ports, err := scanner.ScanPorts()
 	if err != nil {
+		logger.Error("Port scan failed: %v", err)
 		systray.AddMenuItem("❌ Scan failed", err.Error())
+		addBottomMenu()
 		return
 	}
 
 	if len(ports) == 0 {
+		logger.Info("No ports listening")
 		systray.AddMenuItem("No ports listening", "")
+		addBottomMenu()
 		return
 	}
 
@@ -79,11 +98,41 @@ func refreshMenu() {
 		return ports[i].Port < ports[j].Port
 	})
 
-	// Add port menu items (implementation in next step)
+	logger.Info("Found %d listening ports, adding to menu", len(ports))
+
+	// Add port menu items
 	for _, p := range ports {
 		addPortMenuItem(p)
 	}
 
+	addBottomMenu()
+}
+
+// restartApp restarts the application to refresh the menu
+func restartApp() {
+	executable, err := os.Executable()
+	if err != nil {
+		logger.Error("Failed to get executable path: %v", err)
+		return
+	}
+
+	// Start a new instance
+	cmd := exec.Command(executable, os.Args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	err = cmd.Start()
+	if err != nil {
+		logger.Error("Failed to restart app: %v", err)
+		return
+	}
+
+	// Exit current instance
+	systray.Quit()
+}
+
+func addBottomMenu() {
 	// Add quit at bottom
 	systray.AddSeparator()
 	systray.AddMenuItem(fmt.Sprintf("Port Digger v%s", version), "About")
@@ -99,11 +148,13 @@ func refreshMenu() {
 			configPath, err := llm.ConfigPath()
 			if err != nil {
 				println("Failed to get config path:", err.Error())
+				logger.Error("Failed to get config path: %v", err)
 				continue
 			}
 			// Ensure config file exists
 			if err := llm.EnsureDefaultConfig(); err != nil {
 				println("Failed to create default config:", err.Error())
+				logger.Error("Failed to create default config: %v", err)
 			}
 			// Open in default editor using 'open' command on macOS
 			actions.OpenFile(configPath)
@@ -113,6 +164,7 @@ func refreshMenu() {
 	mQuit := systray.AddMenuItem("Quit", "Quit Port Digger")
 	go func() {
 		<-mQuit.ClickedCh
+		logger.Info("Quit button clicked, exiting...")
 		systray.Quit()
 	}()
 }
@@ -153,17 +205,27 @@ func addPortMenuItem(info scanner.PortInfo) {
 		for {
 			select {
 			case <-mOpen.ClickedCh:
+				logger.Info("Opening browser for port %d", info.Port)
 				actions.OpenBrowser(info.Port)
 			case <-mCopy.ClickedCh:
+				logger.Info("Copying port %d to clipboard", info.Port)
 				err := actions.CopyToClipboard(info.Port)
 				if err != nil {
 					println("Failed to copy to clipboard:", err.Error())
+					logger.Error("Failed to copy port %d to clipboard: %v", info.Port, err)
 				}
 			case <-mKill.ClickedCh:
+				logger.Info("Killing process PID %d (port %d)", info.PID, info.Port)
 				err := actions.KillProcess(info.PID)
 				if err != nil {
 					// Could show notification, but keep it simple for now
 					println("Failed to kill process:", err.Error())
+					logger.Error("Failed to kill process PID %d: %v", info.PID, err)
+				} else {
+					logger.Info("Successfully killed process PID %d", info.PID)
+					// Restart app to refresh the port list
+					logger.Info("Restarting app to refresh port list...")
+					restartApp()
 				}
 			}
 		}

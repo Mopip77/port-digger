@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"port-digger/logger"
 	"strconv"
 	"strings"
 )
@@ -132,7 +133,10 @@ func parseLsofLine(line string) (*PortInfo, error) {
 func ScanPorts() ([]PortInfo, error) {
 	// Execute: lsof +c 0 -iTCP -sTCP:LISTEN -nP
 	// +c 0 shows full command name without truncation
-	cmd := exec.Command("lsof", "+c", "0", "-iTCP", "-sTCP:LISTEN", "-nP")
+	cmdArgs := []string{"+c", "0", "-iTCP", "-sTCP:LISTEN", "-nP"}
+	cmd := exec.Command("lsof", cmdArgs...)
+
+	logger.Debug("Executing lsof command: lsof %s", strings.Join(cmdArgs, " "))
 
 	var stdout bytes.Buffer
 	cmd.Stdout = &stdout
@@ -140,8 +144,10 @@ func ScanPorts() ([]PortInfo, error) {
 	if err := cmd.Run(); err != nil {
 		// lsof returns exit code 1 if no ports found - not an error
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 1 {
+			logger.LogLsofQuery(append([]string{"lsof"}, cmdArgs...), 0, nil)
 			return []PortInfo{}, nil
 		}
+		logger.LogLsofQuery(append([]string{"lsof"}, cmdArgs...), 0, err)
 		return nil, fmt.Errorf("lsof command failed: %w", err)
 	}
 
@@ -161,8 +167,10 @@ func ScanPorts() ([]PortInfo, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
+		logger.LogLsofQuery(append([]string{"lsof"}, cmdArgs...), 0, err)
 		return nil, fmt.Errorf("error reading lsof output: %w", err)
 	}
 
+	logger.LogLsofQuery(append([]string{"lsof"}, cmdArgs...), len(ports), nil)
 	return ports, nil
 }

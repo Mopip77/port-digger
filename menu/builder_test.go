@@ -54,7 +54,7 @@ func TestFormatPortItemWithRewrite(t *testing.T) {
 			name:        "with rewritten name",
 			info:        scanner.PortInfo{Port: 3000, ProcessName: "node"},
 			rewriteName: "claude-code-ui",
-			want:        " 3000 • node (claude-code-ui)",
+			want:        " 3000 • node (claude-code-ui✨)",
 		},
 		{
 			name:        "empty rewrite falls back",

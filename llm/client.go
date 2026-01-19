@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"port-digger/logger"
 	"strings"
 	"time"
 )
@@ -76,8 +77,12 @@ func buildPrompt(command string) string {
 
 // RewriteProcessName calls the LLM to extract a service name from the command
 func (c *Client) RewriteProcessName(command string) (string, error) {
+	logger.Debug("LLM rewrite request started for command: %s", command)
+
 	if c.config.URL == "" || c.config.APIKey == "" {
-		return "", fmt.Errorf("LLM not configured")
+		err := fmt.Errorf("LLM not configured")
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	prompt := buildPrompt(command)
@@ -91,45 +96,66 @@ func (c *Client) RewriteProcessName(command string) (string, error) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
+		err = fmt.Errorf("failed to marshal request: %w", err)
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	req, err := http.NewRequest("POST", c.config.URL, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		err = fmt.Errorf("failed to create request: %w", err)
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 
+	logger.Debug("Sending LLM API request to %s with model %s", c.config.URL, c.config.Model)
+
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("request failed: %w", err)
+		err = fmt.Errorf("request failed: %w", err)
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		err = fmt.Errorf("API error (status %d): %s", resp.StatusCode, string(body))
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		err = fmt.Errorf("failed to read response: %w", err)
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	var chatResp ChatResponse
 	if err := json.Unmarshal(body, &chatResp); err != nil {
-		return "", fmt.Errorf("failed to parse response: %w", err)
+		err = fmt.Errorf("failed to parse response: %w", err)
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
 	if len(chatResp.Choices) == 0 {
-		return "", fmt.Errorf("no response choices")
+		err = fmt.Errorf("no response choices")
+		logger.LogLLMRequest(command, "", err)
+		return "", err
 	}
 
-	fmt.Printf("LLM Input: %s\n", command)
-	fmt.Printf("LLM Output: %s\n", chatResp.Choices[0].Message.Content)
-
 	result := strings.TrimSpace(chatResp.Choices[0].Message.Content)
+
+	// Log successful request
+	logger.LogLLMRequest(command, result, nil)
+
+	// Also print to console for visibility
+	fmt.Printf("LLM Input: %s\n", command)
+	fmt.Printf("LLM Output: %s\n", result)
+
 	return result, nil
 }
